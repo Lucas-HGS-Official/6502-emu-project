@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+bin/game
+code/obj/*.o
+code/libs/obj/*.o
