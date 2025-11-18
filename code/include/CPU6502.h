@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
+
 
 class Bus;
 
@@ -8,6 +11,22 @@ class CPU6502 {
 public:
     CPU6502(/* args */);
     ~CPU6502();
+
+public:
+
+    uint8_t a = 0x00;       // Accumulator
+    uint8_t x = 0x00;       // X Resgister
+    uint8_t y = 0x00;       // Y Resgister
+    uint8_t stkp = 0x00;    // Stack Pointer
+    uint8_t status = 0x00;  // Status Register
+    uint16_t pc = 0x0000;   // Program Counter
+
+
+	void reset();	// Reset Interrupt - Forces CPU into known state
+	void irq();		// Interrupt Request - Executes an instruction at a specific location
+	void nmi();		// Non-Maskable Interrupt Request - As above, but cannot be disabled
+	void clock();	// Perform one clock cycle's worth of update
+
 
     enum FLAGS6502 {
         C = (1 << 0),   // Carry bit
@@ -20,21 +39,44 @@ public:
         N = (1 << 7),   // Negative
     };
 
-    uint8_t a = 0x00;       // Accumulator
-    uint8_t x = 0x00;       // X Resgister
-    uint8_t y = 0x00;       // Y Resgister
-    uint8_t stkp = 0x00;    // Stack Pointer
-    uint8_t status = 0x00;  // Status Register
-    uint16_t pc = 0x0000;   // Program Counter
-
-
     void Connect_Bus(Bus* n) { bus = n; }
 
+
+private:
+    Bus* bus = nullptr;
+
+	// Assisstive variables to facilitate emulation
+	uint8_t  fetched     = 0x00;   // Represents the working input value to the ALU
+	uint16_t temp        = 0x0000; // A convenience variable used everywhere
+	uint16_t addr_abs    = 0x0000; // All used memory addresses end up in here
+	uint16_t addr_rel    = 0x00;   // Represents absolute address following a branch
+	uint8_t  opcode      = 0x00;   // Is the instruction byte
+	uint8_t  cycles      = 0;	   // Counts how many cycles the instruction has remaining
+	uint32_t clock_count = 0;	   // A global accumulation of the number of clocks
+
+
+    void Write(uint16_t addr, uint8_t data);
+    uint8_t Read(uint16_t addr);
+
+    uint8_t Get_Flag(FLAGS6502 f);
+    void Set_Flag(FLAGS6502 f, bool v);
+
+	uint8_t fetch();
+
+	struct INSTRUCTION {
+		std::string name;		
+		uint8_t     (CPU6502::*operate )(void) = nullptr;
+		uint8_t     (CPU6502::*addrmode)(void) = nullptr;
+		uint8_t     cycles = 0;
+	};
+
+	std::vector<INSTRUCTION> lookup;
+
+private:
     // Addressing Modes
-    uint8_t IMP();  uint8_t IMM();  uint8_t ZP0();
-    uint8_t ZPX();  uint8_t ZPY();  uint8_t REL();
-    uint8_t ABS();  uint8_t ABX();  uint8_t ZBY();
-    uint8_t IND();  uint8_t IZX();  uint8_t IZY();
+	uint8_t IMP();	uint8_t IMM();  uint8_t ZP0();	uint8_t ZPX();	
+	uint8_t ZPY();	uint8_t REL();  uint8_t ABS();	uint8_t ABX();	
+	uint8_t ABY();	uint8_t IND();	uint8_t IZX();	uint8_t IZY();
 
     // Opcodes
 	uint8_t ADC();	uint8_t AND();	uint8_t ASL();	uint8_t BCC();
@@ -53,14 +95,5 @@ public:
 	uint8_t TSX();	uint8_t TXA();	uint8_t TXS();	uint8_t TYA();
 
     uint8_t XXX();  // Illegal Opcodes
-
-private:
-    Bus* bus = nullptr;
-
-    void Write(uint16_t addr, uint8_t data);
-    uint8_t Read(uint16_t addr, bool is_read_only = false);
-
-    uint8_t Get_Flag(FLAGS6502 f);
-    void Set_Flag(FLAGS6502 f, bool v);
 };
 
