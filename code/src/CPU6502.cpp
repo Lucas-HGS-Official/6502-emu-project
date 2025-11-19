@@ -40,5 +40,16 @@ uint8_t CPU6502::Read(uint16_t addr) {
 void CPU6502::clock() {
 	if (cycles == 0) {
 		opcode = Read(pc);
+		pc++;
+
+		cycles = lookup[opcode].cycles;
+
+		uint8_t additional_cycle1 = (this->*lookup[opcode].addrmode)();
+
+		uint8_t additional_cycle2 = (this->*lookup[opcode].operate)();
+
+		cycles += (additional_cycle1 & additional_cycle2);
 	}
+
+	cycles--;
 }
