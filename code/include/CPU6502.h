@@ -22,10 +22,10 @@ public:
     uint16_t pc = 0x0000;   // Program Counter
 
 
-	void reset();	// Reset Interrupt - Forces CPU into known state
+	void Reset();	// Reset Interrupt - Forces CPU into known state
 	void irq();		// Interrupt Request - Executes an instruction at a specific location
 	void nmi();		// Non-Maskable Interrupt Request - As above, but cannot be disabled
-	void clock();	// Perform one clock cycle's worth of update
+	void Clock();	// Perform one clock cycle's worth of update
 
 
     enum FLAGS6502 {

@@ -37,7 +37,7 @@ uint8_t CPU6502::Read(uint16_t addr) {
     return bus->Read(addr, false);
 }
 
-void CPU6502::clock() {
+void CPU6502::Clock() {
 	if (cycles == 0) {
 		opcode = Read(pc);
 		pc++;
@@ -52,4 +52,149 @@ void CPU6502::clock() {
 	}
 
 	cycles--;
+}
+
+uint8_t CPU6502::Get_Flag(FLAGS6502 f) {
+	return ((status & f) > 0) ? 1 : 0;
+}
+
+void CPU6502::Set_Flag(FLAGS6502 f, bool v) {
+	if (v)
+		status |= f;
+	else
+		status &= ~f;
+}
+
+// Addressing Modes
+uint8_t CPU6502::IMP() {
+	fetched = a;
+
+	return 0;
+}
+
+uint8_t CPU6502:: IMM() {
+	addr_abs = (pc++);
+
+	return 0;
+}
+
+uint8_t CPU6502::ZP0() {
+	addr_abs = Read(pc);
+	pc++;
+	addr_abs &= 0x00FF;
+
+	return 0;
+}
+
+uint8_t CPU6502::ZPX() {
+	addr_abs = (Read(pc) + x);
+	pc++;
+	addr_abs &= 0x00FF;
+
+	return 0;
+}
+
+uint8_t CPU6502::ZPY() {
+	addr_abs = (Read(pc) + y);
+	pc++;
+	addr_abs &= 0x00FF;
+
+	return 0;
+}
+
+uint8_t CPU6502::ABS() {
+	uint16_t lo = Read(pc);
+	pc++;
+	uint16_t hi = Read(pc);
+	pc++;
+
+	addr_abs = (hi << 8) | lo;
+
+	return 0;
+}
+
+uint8_t CPU6502::ABX() {
+	uint16_t lo = Read(pc);
+	pc++;
+	uint16_t hi = Read(pc);
+	pc++;
+
+	addr_abs = (hi << 8) | lo;
+	addr_abs += x;
+
+	if ((addr_abs & 0xFF00) != (hi << 8))
+		return 1;
+	
+	return 0;
+}
+
+uint8_t CPU6502::ABY() {
+	uint16_t lo = Read(pc);
+	pc++;
+	uint16_t hi = Read(pc);
+	pc++;
+
+	addr_abs = (hi << 8) | lo;
+	addr_abs += y;
+
+	if ((addr_abs & 0xFF00) != (hi << 8))
+		return 1;
+	
+	return 0;
+}
+
+uint8_t CPU6502::IND() {
+	uint16_t ptr_lo = Read(pc);
+	pc++;
+	uint16_t ptr_hi = Read(pc);
+	pc++;
+
+	uint16_t ptr = (ptr_hi << 8) | ptr_lo;
+
+	if (ptr_lo == 0x00FF)	// Simulate page boundary hardware bug
+		addr_abs = (Read(ptr & 0xFF00) << 8) | Read(ptr + 0);
+	
+	else	// Behave normally
+		addr_abs = (Read(ptr + 1) << 8) | Read(ptr + 0);
+	
+	return 0;
+}
+
+uint8_t CPU6502::IZX()
+{
+	uint16_t t = Read(pc);
+	pc++;
+
+	uint16_t lo = Read((uint16_t)(t + (uint16_t)x) & 0x00FF);
+	uint16_t hi = Read((uint16_t)(t + (uint16_t)x + 1) & 0x00FF);
+
+	addr_abs = (hi << 8) | lo;
+	
+	return 0;
+}
+
+uint8_t CPU6502::IZY()
+{
+	uint16_t t = Read(pc);
+	pc++;
+
+	uint16_t lo = Read(t & 0x00FF);
+	uint16_t hi = Read((t + 1) & 0x00FF);
+
+	addr_abs = (hi << 8) | lo;
+	addr_abs += y;
+	
+	if ((addr_abs & 0xFF00) != (hi << 8))
+		return 1;
+	else
+		return 0;
+}
+
+uint8_t CPU6502::REL() {
+	addr_rel = Read(pc);
+	pc++;
+	if (addr_rel & 0x80)
+		addr_rel |= 0xFF00;
+	
+	return 0;
 }
