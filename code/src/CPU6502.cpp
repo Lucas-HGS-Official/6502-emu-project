@@ -54,6 +54,67 @@ void CPU6502::Clock() {
 	cycles--;
 }
 
+void CPU6502::Reset() {
+	a = 0;
+	x = 0;
+	y = 0;
+	stkp = 0;
+	status = 0x00 | U;
+
+	addr_abs = 0xFFFC;
+	uint16_t lo = Read(addr_abs + 0);
+	uint16_t hi = Read(addr_abs + 1);
+	pc = (hi << 8) | lo;
+
+	addr_rel = 0x0000;
+	addr_abs = 0x0000;
+	fetched = 0x00;
+
+	cycles = 8;
+}
+
+void CPU6502::irq() {
+	if (Get_Flag(I) == 0) {
+		Write(0x0100 + stkp, (pc >> 8) & 0x0FF);
+		stkp--;
+		Write(0x0100 + stkp, pc & 0x00FF);
+		stkp--;
+
+		Set_Flag(B, 0);
+		Set_Flag(U, 1);
+		Set_Flag(I, 1);
+		Write(0x0100 + stkp, status);
+		stkp--;
+
+		addr_abs = 0xFFFE;
+		uint16_t lo = Read(addr_abs + 0);
+		uint16_t hi = Read(addr_abs + 1);
+		pc = (hi << 8) | lo;
+
+		cycles = 7;
+	}
+}
+
+void CPU6502::nmi() {
+	Write(0x0100 + stkp, (pc >> 8) & 0x0FF);
+	stkp--;
+	Write(0x0100 + stkp, pc & 0x00FF);
+	stkp--;
+
+	Set_Flag(B, 0);
+	Set_Flag(U, 1);
+	Set_Flag(I, 1);
+	Write(0x0100 + stkp, status);
+	stkp--;
+
+	addr_abs = 0xFFFA;
+	uint16_t lo = Read(addr_abs + 0);
+	uint16_t hi = Read(addr_abs + 1);
+	pc = (hi << 8) | lo;
+
+	cycles = 8;
+}
+
 uint8_t CPU6502::Get_Flag(FLAGS6502 f) {
 	return ((status & f) > 0) ? 1 : 0;
 }
@@ -196,5 +257,584 @@ uint8_t CPU6502::REL() {
 	if (addr_rel & 0x80)
 		addr_rel |= 0xFF00;
 	
+	return 0;
+}
+
+// Instructions
+uint8_t CPU6502::fetch() {
+	if (!(lookup[opcode].addrmode == &CPU6502::IMP))
+		fetched = Read(addr_abs);
+	
+	return fetched;
+}
+
+uint8_t CPU6502::XXX() {
+
+	return 0;
+}
+
+uint8_t CPU6502::NOP()
+{
+	// Sadly not all NOPs are equal, Ive added a few here
+	// based on https://wiki.nesdev.com/w/index.php/CPU_unofficial_opcodes
+	// and will add more based on game compatibility, and ultimately
+	// I'd like to cover all illegal opcodes too
+	switch (opcode) {
+	case 0x1C:
+	case 0x3C:
+	case 0x5C:
+	case 0x7C:
+	case 0xDC:
+	case 0xFC:
+		XXX();
+		break;
+	}
+
+	return 0;
+}
+
+uint8_t CPU6502::BRK() {
+	pc++;
+	
+	Set_Flag(I, 1);
+	Write(0x0100 + stkp, (pc >> 8) & 0x00FF);
+	stkp--;
+	Write(0x0100 + stkp, pc & 0x00FF);
+	stkp--;
+
+	Set_Flag(B, 1);
+	Write(0x0100 + stkp, status);
+	stkp--;
+	Set_Flag(B, 0);
+
+	pc = (uint16_t)Read(0xFFFE) | ((uint16_t)Read(0xFFFF) << 8);
+
+	return 0;
+}
+
+uint8_t CPU6502::RTI() {
+	stkp++;
+	status = Read(0x0100 + stkp);
+	status &= ~B;
+	status &= ~U;
+
+	stkp++;
+	pc = (uint16_t) Read(0x0100 + stkp);
+	stkp++;
+	pc |= (uint16_t) Read(0x0100 + stkp) << 8;
+
+	return 0;
+}
+
+uint8_t CPU6502::RTS() {
+	stkp++;
+	pc = (uint16_t)Read(0x0100 + stkp);
+	stkp++;
+	pc |= (uint16_t)Read(0x0100 + stkp) << 8;
+	
+	pc++;
+	
+	return 0;
+}
+
+uint8_t CPU6502::AND() {
+	fetch();
+	a = a & fetched;
+	Set_Flag(Z, a == 0x00);
+	Set_Flag(N, a & 0x80);
+
+	return 1;
+}
+
+uint8_t CPU6502::BCS() {
+	if (Get_Flag(C) == 1) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00))
+			cycles++;
+		
+		pc = addr_abs;
+	}
+
+	return 0;
+}
+
+uint8_t CPU6502::BCC() {
+	if (Get_Flag(C) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00))
+			cycles++;
+		
+		pc = addr_abs;
+	}
+
+	return 0;
+}
+
+uint8_t CPU6502::BEQ() {
+	if (Get_Flag(Z) == 1) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00))
+			cycles++;
+		
+		pc = addr_abs;
+	}
+
+	return 0;
+}
+
+uint8_t CPU6502::BNE() {
+	if (Get_Flag(Z) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00))
+			cycles++;
+		
+		pc = addr_abs;
+	}
+
+	return 0;
+}
+
+uint8_t CPU6502::BMI() {
+	if (Get_Flag(N) == 1) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00))
+			cycles++;
+		
+		pc = addr_abs;
+	}
+
+	return 0;
+}
+
+uint8_t CPU6502::BPL() {
+	if (Get_Flag(N) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00))
+			cycles++;
+		
+		pc = addr_abs;
+	}
+
+	return 0;
+}
+
+uint8_t CPU6502::BVC() {
+	if (Get_Flag(V) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00))
+			cycles++;
+		
+		pc = addr_abs;
+	}
+
+	return 0;
+}
+
+uint8_t CPU6502::BVS() {
+	if (Get_Flag(V) == 1) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00))
+			cycles++;
+		
+		pc = addr_abs;
+	}
+
+	return 0;
+}
+
+uint8_t CPU6502::CLC() {
+	Set_Flag(C, false);
+
+	return 0;
+}
+
+uint8_t CPU6502::CLD() {
+	Set_Flag(D, false);
+
+	return 0;
+}
+
+uint8_t CPU6502::CLI() {
+	Set_Flag(I, false);
+
+	return 0;
+}
+
+uint8_t CPU6502::CLV() {
+	Set_Flag(V, false);
+
+	return 0;
+}
+
+uint8_t CPU6502::ADC() {
+	fetch();
+
+	uint16_t temp = (uint16_t) a + (uint16_t) fetched + (uint16_t) Get_Flag(C);
+	Set_Flag(C, temp > 255);
+	Set_Flag(Z, (temp & 0x00FF) == 0);
+	Set_Flag(N, temp & 0x80);
+	Set_Flag(V, (~((uint16_t)a ^ (uint16_t)fetched) & ((uint16_t)a ^ (uint16_t)temp)) & 0x0080);
+
+	a = temp & 0x00FF;
+
+	return 1;
+}
+
+uint8_t CPU6502::SBC() {
+	fetch();
+
+	uint16_t value = ((uint16_t) fetched) ^ 0x00FF;
+
+	uint16_t temp = (uint16_t) a + (uint16_t) value + (uint16_t) Get_Flag(C);
+	Set_Flag(C, temp > 255);
+	Set_Flag(Z, (temp & 0x00FF) == 0);
+	Set_Flag(N, temp & 0x80);
+	Set_Flag(V, (temp ^ (uint16_t) a) & (temp ^ value) & 0x0080);
+
+	a = temp & 0x00FF;
+
+	return 1;
+}
+
+uint8_t CPU6502::PHA() {
+	Write(0x0100 + stkp, a);
+	stkp--;
+
+	return 0;
+}
+
+uint8_t CPU6502::PLA() {
+	stkp++;
+	a = Read(0x0100 + stkp);
+	Set_Flag(Z, a == 0x00);
+	Set_Flag(N, a & 0x80);
+
+	return 0;
+}
+
+uint8_t CPU6502::ORA() {
+	fetch();
+	a = a | fetched;
+	Set_Flag(Z, a == 0x00);
+	Set_Flag(N, a & 0x80);
+
+	return 1;
+}
+
+uint8_t CPU6502::EOR() {
+	fetch();
+	a = a ^ fetched;	
+	Set_Flag(Z, a == 0x00);
+	Set_Flag(N, a & 0x80);
+
+	return 1;
+}
+
+uint8_t CPU6502::ASL() {
+	fetch();
+	temp = (uint16_t)fetched << 1;
+	Set_Flag(C, (temp & 0xFF00) > 0);
+	Set_Flag(Z, (temp & 0x00FF) == 0x00);
+	Set_Flag(N, temp & 0x80);
+	if (lookup[opcode].addrmode == &CPU6502::IMP)
+		a = temp & 0x00FF;
+	else
+		Write(addr_abs, temp & 0x00FF);
+	
+	return 0;
+}
+
+uint8_t CPU6502::PHP() {
+	Write(0x0100 + stkp, status | B | U);
+	Set_Flag(B, 0);
+	Set_Flag(U, 0);
+	stkp--;
+
+	return 0;
+}
+
+uint8_t CPU6502::CMP() {
+	fetch();
+	temp = (uint16_t) a - (uint16_t) fetched;
+	Set_Flag(C, a >= fetched);
+	Set_Flag(Z, (temp & 0x00FF) == 0x0000);
+	Set_Flag(N, temp & 0x0080);
+
+	return 1;
+}
+
+uint8_t CPU6502::CPX() {
+	fetch();
+	temp = (uint16_t) x - (uint16_t) fetched;
+	Set_Flag(C, x >= fetched);
+	Set_Flag(Z, (temp & 0x00FF) == 0x0000);
+	Set_Flag(N, temp & 0x0080);
+	
+	return 0;
+}
+
+uint8_t CPU6502::CPY() {
+	fetch();
+	temp = (uint16_t) y - (uint16_t) fetched;
+	Set_Flag(C, y >= fetched);
+	Set_Flag(Z, (temp & 0x00FF) == 0x0000);
+	Set_Flag(N, temp & 0x0080);
+	
+	return 0;
+}
+
+uint8_t CPU6502::JSR() {
+	pc--;
+
+	Write(0x0100 + stkp, (pc >> 8) & 0x00FF);
+	stkp--;
+	Write(0x0100 + stkp, pc & 0x00FF);
+	stkp--;
+
+	pc = addr_abs;
+
+	return 0;
+}
+
+uint8_t CPU6502::BIT() {
+	fetch();
+	temp = a & fetched;
+	Set_Flag(Z, (temp & 0x00FF) == 0x00);
+	Set_Flag(N, fetched & (1 << 7));
+	Set_Flag(V, fetched & (1 << 6));
+
+	return 0;
+}
+
+uint8_t CPU6502::INC() {
+	fetch();
+	temp = fetched + 1;
+	Write(addr_abs, temp & 0x00FF);
+	Set_Flag(Z, (temp & 0x00FF) == 0x0000);
+	Set_Flag(N, temp & 0x0080);
+	
+	return 0;
+}
+
+uint8_t CPU6502::INX() {
+	x++;
+	Set_Flag(Z, x == 0x00);
+	Set_Flag(N, x & 0x80);
+	
+	return 0;
+}
+
+uint8_t CPU6502::INY() {
+	y++;
+	Set_Flag(Z, y == 0x00);
+	Set_Flag(N, y & 0x80);
+
+	return 0;
+}
+
+uint8_t CPU6502::DEC() {
+	fetch();
+	temp = fetched - 1;
+	Write(addr_abs, temp & 0x00FF);
+	Set_Flag(Z, (temp & 0x00FF) == 0x0000);
+	Set_Flag(N, temp & 0x0080);
+	
+	return 0;
+}
+
+uint8_t CPU6502::DEX() {
+	x--;
+	Set_Flag(Z, x == 0x00);
+	Set_Flag(N, x & 0x80);
+	
+	return 0;
+}
+
+uint8_t CPU6502::DEY() {
+	y--;
+	Set_Flag(Z, y == 0x00);
+	Set_Flag(N, y & 0x80);
+	
+	return 0;
+}
+
+uint8_t CPU6502::LDA() {
+	fetch();
+	a = fetched;
+	Set_Flag(Z, a == 0x00);
+	Set_Flag(N, a & 0x80);
+	
+	return 1;
+}
+
+uint8_t CPU6502::LDX() {
+	fetch();
+	x = fetched;
+	Set_Flag(Z, x == 0x00);
+	Set_Flag(N, x & 0x80);
+
+	return 1;
+}
+
+uint8_t CPU6502::LDY() {
+	fetch();
+	y = fetched;
+	Set_Flag(Z, y == 0x00);
+	Set_Flag(N, y & 0x80);
+
+	return 1;
+}
+
+uint8_t CPU6502::TAX() {
+	x = a;
+	Set_Flag(Z, x == 0x00);
+	Set_Flag(N, x & 0x80);
+	
+	return 0;
+}
+
+uint8_t CPU6502::TAY() {
+	y = a;
+	Set_Flag(Z, y == 0x00);
+	Set_Flag(N, y & 0x80);
+	
+	return 0;
+}
+
+uint8_t CPU6502::TSX() {
+	x = stkp;
+	Set_Flag(Z, x == 0x00);
+	Set_Flag(N, x & 0x80);
+	
+	return 0;
+}
+
+uint8_t CPU6502::TXA() {
+	a = x;
+	Set_Flag(Z, a == 0x00);
+	Set_Flag(N, a & 0x80);
+	
+	return 0;
+}
+
+uint8_t CPU6502::TXS() {
+	stkp = x;
+
+	return 0;
+}
+
+uint8_t CPU6502::TYA() {
+	a = y;
+	Set_Flag(Z, a == 0x00);
+	Set_Flag(N, a & 0x80);
+
+	return 0;
+}
+
+uint8_t CPU6502::STA() {
+	Write(addr_abs, a);
+	
+	return 0;
+}
+
+uint8_t CPU6502::STX() {
+	Write(addr_abs, x);
+
+	return 0;
+}
+
+uint8_t CPU6502::STY() {
+	Write(addr_abs, y);
+	
+	return 0;
+}
+
+uint8_t CPU6502::SEC() {
+	Set_Flag(C, true);
+
+	return 0;
+}
+
+uint8_t CPU6502::SED() {
+	Set_Flag(D, true);
+	
+	return 0;
+}
+
+uint8_t CPU6502::SEI() {
+	Set_Flag(I, true);
+	
+	return 0;
+}
+
+uint8_t CPU6502::PLP() {
+	stkp++;
+	status = Read(0x0100 + stkp);
+	Set_Flag(U, 1);
+
+	return 0;
+}
+
+uint8_t CPU6502::ROL() {
+	fetch();
+	temp = (uint16_t)(fetched << 1) | Get_Flag(C);
+	Set_Flag(C, temp & 0xFF00);
+	Set_Flag(Z, (temp & 0x00FF) == 0x0000);
+	Set_Flag(N, temp & 0x0080);
+	if (lookup[opcode].addrmode == &CPU6502::IMP)
+		a = temp & 0x00FF;
+	else
+		Write(addr_abs, temp & 0x00FF);
+
+	return 0;
+}
+
+uint8_t CPU6502::ROR() {
+	fetch();
+	temp = (uint16_t)(Get_Flag(C) << 7) | (fetched >> 1);
+	Set_Flag(C, fetched & 0x01);
+	Set_Flag(Z, (temp & 0x00FF) == 0x00);
+	Set_Flag(N, temp & 0x0080);
+	if (lookup[opcode].addrmode == &CPU6502::IMP)
+		a = temp & 0x00FF;
+	else
+		Write(addr_abs, temp & 0x00FF);
+
+	return 0;
+}
+
+uint8_t CPU6502::LSR() {
+	fetch();
+	Set_Flag(C, fetched & 0x0001);
+	temp = fetched >> 1;	
+	Set_Flag(Z, (temp & 0x00FF) == 0x0000);
+	Set_Flag(N, temp & 0x0080);
+	if (lookup[opcode].addrmode == &CPU6502::IMP)
+		a = temp & 0x00FF;
+	else
+		Write(addr_abs, temp & 0x00FF);
+
+	return 0;
+}
+
+uint8_t CPU6502::JMP() {
+	pc = addr_abs;
+
 	return 0;
 }
