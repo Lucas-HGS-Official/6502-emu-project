@@ -15,7 +15,7 @@ from_scratch: clean build
 build: $(TARGET)
 
 $(TARGET): $(OBJ)
-	g++ -o $@ $? -std=c++20
+	g++ -o $@ $? -std=c++20 -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 
 code/obj/%.o : code/src/%.cpp
 	g++ -c $< -o $@ -Icode/include -Icode/libs/include
