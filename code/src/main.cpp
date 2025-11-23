@@ -17,6 +17,12 @@ public:
     Bus nes;
     std::map<uint16_t, std::string> map_asm;
 
+    Font myfont;
+    void DrawTextB(const char *text, int posX, int posY, int fontSize, Color color) {
+        DrawTextEx(myfont, text, (Vector2){ (float) posX, (float) posY }, fontSize, 1, color);
+    }
+
+
     std::string Hex(uint32_t n, uint8_t d) {
         std::string s(d, '0');
         for(int i = d-1; i>=0; i--, n >>= 4)
@@ -32,38 +38,38 @@ public:
 				s_offset += " " + Hex(nes.Read(nAddr, true), 2);
 				nAddr += 1;
 			}
-            DrawText(s_offset.c_str(), n_ramX, n_ramY, FONTSIZE, RAYWHITE);
+            DrawTextB(s_offset.c_str(), n_ramX, n_ramY, FONTSIZE, RAYWHITE);
 			n_ramY += LETTER_SPACING_Y;
         }
     }
 
     void Draw_CPU(int x, int y) {
 		std::string status = "STATUS: ";
-        DrawText("STATUS:", x, y, FONTSIZE, RAYWHITE);
-        DrawText("N", x + 72, y, FONTSIZE, nes.cpu.status & CPU6502::N ? GREEN : RED);
-        DrawText("V", x + 88, y, FONTSIZE, nes.cpu.status & CPU6502::V ? GREEN : RED);
-        DrawText("-", x + 104, y, FONTSIZE, nes.cpu.status & CPU6502::U ? GREEN : RED);
-        DrawText("B", x + 120, y, FONTSIZE, nes.cpu.status & CPU6502::B ? GREEN : RED);
-        DrawText("D", x + 136, y, FONTSIZE, nes.cpu.status & CPU6502::D ? GREEN : RED);
-        DrawText("I", x + 152, y, FONTSIZE, nes.cpu.status & CPU6502::I ? GREEN : RED);
-        DrawText("Z", x + 168, y, FONTSIZE, nes.cpu.status & CPU6502::Z ? GREEN : RED);
-        DrawText("C", x + 184, y, FONTSIZE, nes.cpu.status & CPU6502::C ? GREEN : RED);
-        DrawText(("PC: $" + Hex(nes.cpu.pc, 4)).c_str(), x, y + LETTER_SPACING_Y, FONTSIZE, RAYWHITE);
-        DrawText(("A: $" + Hex(nes.cpu.a, 2) + " [" + std::to_string(nes.cpu.a) + "]").c_str(), x, y + (LETTER_SPACING_Y * 2), FONTSIZE, RAYWHITE);
-        DrawText(("X: $" + Hex(nes.cpu.x, 2) + " [" + std::to_string(nes.cpu.x) + "]").c_str(), x, y + (LETTER_SPACING_Y * 3), FONTSIZE, RAYWHITE);
-        DrawText(("y: $" + Hex(nes.cpu.y, 2) + " [" + std::to_string(nes.cpu.y) + "]").c_str(), x, y + (LETTER_SPACING_Y * 4), FONTSIZE, RAYWHITE);
-        DrawText(("Stack P: $" + Hex(nes.cpu.stkp, 4)).c_str(), x, y + (LETTER_SPACING_Y * 5), FONTSIZE, RAYWHITE);
+        DrawTextB("STATUS:", x, y, FONTSIZE, RAYWHITE);
+        DrawTextB("N", x + 72, y, FONTSIZE, nes.cpu.status & CPU6502::N ? GREEN : RED);
+        DrawTextB("V", x + 88, y, FONTSIZE, nes.cpu.status & CPU6502::V ? GREEN : RED);
+        DrawTextB("-", x + 104, y, FONTSIZE, nes.cpu.status & CPU6502::U ? GREEN : RED);
+        DrawTextB("B", x + 120, y, FONTSIZE, nes.cpu.status & CPU6502::B ? GREEN : RED);
+        DrawTextB("D", x + 136, y, FONTSIZE, nes.cpu.status & CPU6502::D ? GREEN : RED);
+        DrawTextB("I", x + 152, y, FONTSIZE, nes.cpu.status & CPU6502::I ? GREEN : RED);
+        DrawTextB("Z", x + 168, y, FONTSIZE, nes.cpu.status & CPU6502::Z ? GREEN : RED);
+        DrawTextB("C", x + 184, y, FONTSIZE, nes.cpu.status & CPU6502::C ? GREEN : RED);
+        DrawTextB(("PC: $" + Hex(nes.cpu.pc, 4)).c_str(), x, y + LETTER_SPACING_Y, FONTSIZE, RAYWHITE);
+        DrawTextB(("A: $" + Hex(nes.cpu.a, 2) + " [" + std::to_string(nes.cpu.a) + "]").c_str(), x, y + (LETTER_SPACING_Y * 2), FONTSIZE, RAYWHITE);
+        DrawTextB(("X: $" + Hex(nes.cpu.x, 2) + " [" + std::to_string(nes.cpu.x) + "]").c_str(), x, y + (LETTER_SPACING_Y * 3), FONTSIZE, RAYWHITE);
+        DrawTextB(("y: $" + Hex(nes.cpu.y, 2) + " [" + std::to_string(nes.cpu.y) + "]").c_str(), x, y + (LETTER_SPACING_Y * 4), FONTSIZE, RAYWHITE);
+        DrawTextB(("Stack P: $" + Hex(nes.cpu.stkp, 4)).c_str(), x, y + (LETTER_SPACING_Y * 5), FONTSIZE, RAYWHITE);
     }
 
     void Draw_Code(int x, int y, int n_lines) {
         auto it_a = map_asm.find(nes.cpu.pc);
         int n_lineY = (n_lines >> 1) * LETTER_SPACING_Y + y;
         if (it_a != map_asm.end()) {
-            DrawText(((*it_a).second).c_str(), x, n_lineY, FONTSIZE, SKYBLUE);
+            DrawTextB(((*it_a).second).c_str(), x, n_lineY, FONTSIZE, SKYBLUE);
             while (n_lineY < (n_lines * LETTER_SPACING_Y) + y) {
                 n_lineY += LETTER_SPACING_Y;
                 if (++it_a != map_asm.end()) {
-                    DrawText(((*it_a).second).c_str(), x, n_lineY, FONTSIZE, RAYWHITE);
+                    DrawTextB(((*it_a).second).c_str(), x, n_lineY, FONTSIZE, RAYWHITE);
                 }
             }
         }
@@ -74,7 +80,7 @@ public:
             while (n_lineY > y) {
                 n_lineY -= LETTER_SPACING_Y;
                 if (--it_a != map_asm.end()) {
-                    DrawText(((*it_a).second).c_str(), x, n_lineY, FONTSIZE, RAYWHITE);
+                    DrawTextB(((*it_a).second).c_str(), x, n_lineY, FONTSIZE, RAYWHITE);
                 }
             }
         }
@@ -153,7 +159,7 @@ public:
 		Draw_Code(448, 96, 26);
 
 
-		DrawText("SPACE = Step Instruction    R = RESET    I = IRQ    N = NMI", 10, 500, FONTSIZE, RAYWHITE);
+		DrawTextB("SPACE = Step Instruction    R = RESET    I = IRQ    N = NMI", 10, 500, FONTSIZE, RAYWHITE);
 
 		return true;
 	}
@@ -163,6 +169,7 @@ int main(void) {
     // Initialization
     //--------------------------------------------------------------------------------------
     Demo_CPU6502 demo;
+    demo.myfont = LoadFontEx("resources/fonts/JetBrainsMono-Bold.ttf", FONTSIZE, NULL, 0);
     demo.On_User_Create();
     const int screenWidth = 680 * 2;
     const int screenHeight = 480 * 2;
@@ -185,7 +192,7 @@ int main(void) {
         BeginDrawing();
 
             demo.On_User_Update(1.f);
-            
+
         EndDrawing();
         //----------------------------------------------------------------------------------
     }
