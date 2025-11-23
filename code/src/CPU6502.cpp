@@ -58,7 +58,7 @@ void CPU6502::Reset() {
 	a = 0;
 	x = 0;
 	y = 0;
-	stkp = 0;
+	stkp =  0xFD;
 	status = 0x00 | U;
 
 	addr_abs = 0xFFFC;
@@ -504,7 +504,7 @@ uint8_t CPU6502::SBC() {
 	uint16_t temp = (uint16_t) a + (uint16_t) value + (uint16_t) Get_Flag(C);
 	Set_Flag(C, temp > 255);
 	Set_Flag(Z, (temp & 0x00FF) == 0);
-	Set_Flag(N, temp & 0x80);
+	Set_Flag(N, temp & 0x0080);
 	Set_Flag(V, (temp ^ (uint16_t) a) & (temp ^ value) & 0x0080);
 
 	a = temp & 0x00FF;
