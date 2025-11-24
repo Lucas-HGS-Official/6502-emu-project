@@ -168,13 +168,14 @@ public:
 int main(void) {
     // Initialization
     //--------------------------------------------------------------------------------------
-    Demo_CPU6502 demo;
-    demo.myfont = LoadFontEx("resources/fonts/JetBrainsMono-Bold.ttf", FONTSIZE, NULL, 0);
-    demo.On_User_Create();
     const int screenWidth = 680 * 2;
     const int screenHeight = 480 * 2;
 
     InitWindow(screenWidth, screenHeight, "CPU 6502 Demonstration");
+
+    Demo_CPU6502 demo;
+    demo.myfont = LoadFont("resources/fonts/JetBrainsMono-Bold.ttf");
+    demo.On_User_Create();
 
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
